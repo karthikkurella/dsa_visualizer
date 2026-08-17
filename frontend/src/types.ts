@@ -1,3 +1,9 @@
+export interface StackFrame {
+  function: string
+  line: number | null
+  variables: Record<string, string>
+}
+
 export interface TraceStep {
   step: number
   line: number | null
@@ -6,6 +12,7 @@ export interface TraceStep {
   stdout: string
   call_depth: number
   function?: string | null
+  stack?: StackFrame[]
 }
 
 export interface TraceResponse {

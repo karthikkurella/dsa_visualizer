@@ -151,11 +151,7 @@ function App() {
               disabled={!trace || trace.steps.length === 0}
             />
 
-            <VariablesPanel
-              variables={currentStep?.variables ?? {}}
-              callDepth={currentStep?.call_depth ?? 0}
-              functionName={currentStep?.function}
-            />
+            <VariablesPanel stack={currentStep?.stack ?? []} />
 
             <div className="panel output-panel">
               <div className="panel-header">
