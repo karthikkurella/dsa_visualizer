@@ -110,6 +110,8 @@ class _TypeStub:
 
 def _typing_stubs() -> str:
     return """
+__name__ = "__main__"
+
 class _TypeStub:
     def __getitem__(self, _item):
         return self

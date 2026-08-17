@@ -233,7 +233,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     stdin_buffer = io.StringIO(stdin_text)
     old_stdin = sys.stdin
 
-    globals_dict: dict[str, Any] = {"__builtins__": _safe_builtins()}
+    globals_dict: dict[str, Any] = {"__builtins__": _safe_builtins(), "__name__": "__main__"}
     compiled = compile(executable, "<user_code>", "exec")
 
     try:
