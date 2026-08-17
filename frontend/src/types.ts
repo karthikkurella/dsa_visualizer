@@ -2,6 +2,8 @@ export interface StackFrame {
   function: string
   line: number | null
   variables: Record<string, string>
+  label?: string
+  recursion?: number | null
 }
 
 export interface TraceStep {
