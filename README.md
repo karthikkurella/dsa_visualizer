@@ -61,8 +61,11 @@ Select your project when prompted. This updates `.firebaserc`.
 ### Step 3 — Deploy
 
 ```bash
+git pull origin main   # make sure you have the latest code
 npm run deploy
 ```
+
+> **If you see `tsc: command not found`:** your code is outdated. Run `git pull origin main` — the build no longer uses `tsc`.
 
 Or:
 

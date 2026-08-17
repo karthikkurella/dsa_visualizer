@@ -103,6 +103,61 @@ def _validate_code(source: str) -> str | None:
     return None
 
 
+class _TypeStub:
+    def __getitem__(self, _item: Any) -> _TypeStub:
+        return self
+
+
+def _typing_stubs() -> str:
+    return """
+class _TypeStub:
+    def __getitem__(self, _item):
+        return self
+
+List = Dict = Set = Tuple = Optional = _TypeStub()
+"""
+
+
+def _find_solution_method(code: str) -> tuple[str, list[str]] | None:
+    tree = ast.parse(code)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "Solution":
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and not item.name.startswith("_"):
+                    params = [arg.arg for arg in item.args.args if arg.arg != "self"]
+                    return item.name, params
+    return None
+
+
+def _prepare_code(source: str, input_text: str) -> tuple[str, str]:
+    """Wrap LeetCode Solution classes and merge variable inputs."""
+    stripped_input = input_text.strip()
+
+    if "class Solution" in source:
+        method_info = _find_solution_method(source)
+        if not method_info:
+            body = f"{_typing_stubs()}\n{source}"
+            return body, stripped_input
+
+        method_name, params = method_info
+        call_args = ", ".join(params)
+        body = f"""{_typing_stubs()}
+{source}
+
+{stripped_input}
+
+_solution = Solution()
+_result = _solution.{method_name}({call_args})
+print(_result)
+"""
+        return body, ""
+
+    if stripped_input and "=" in stripped_input:
+        return f"{source}\n\n{stripped_input}", ""
+
+    return source, stripped_input
+
+
 def _safe_builtins() -> dict[str, Any]:
     allowed = {
         "abs", "all", "any", "bin", "bool", "chr", "dict", "enumerate", "filter",
@@ -110,6 +165,9 @@ def _safe_builtins() -> dict[str, Any]:
         "len", "list", "map", "max", "min", "oct", "ord", "pow", "print", "range",
         "reversed", "round", "set", "slice", "sorted", "str", "sum", "tuple", "zip",
         "True", "False", "None",
+        "__build_class__", "staticmethod", "classmethod", "property", "super",
+        "type", "object", "callable", "iter", "next",
+        "Exception", "ValueError", "IndexError", "KeyError", "RuntimeError", "AttributeError",
     }
     return {name: getattr(builtins, name) for name in allowed}
 
@@ -119,7 +177,8 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     if validation_error:
         return TraceResult(success=False, error=validation_error)
 
-    source_lines = source.splitlines()
+    executable, stdin_text = _prepare_code(source, stdin_text)
+    source_lines = executable.splitlines()
     steps: list[TraceStep] = []
     stdout_buffer = io.StringIO()
     step_counter = 0
@@ -175,7 +234,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     old_stdin = sys.stdin
 
     globals_dict: dict[str, Any] = {"__builtins__": _safe_builtins()}
-    compiled = compile(source, "<user_code>", "exec")
+    compiled = compile(executable, "<user_code>", "exec")
 
     try:
         sys.stdin = stdin_buffer
