@@ -4,12 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "sync-tracer": "cp ../backend/tracer.py src/tracer/tracer.py",
+    "predev": "npm run sync-tracer",
     "dev": "vite",
+    "prebuild": "npm run sync-tracer",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "pyodide": "^0.26.4",
+    "pyodide": "^0.26.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

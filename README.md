@@ -2,6 +2,8 @@
 
 Step through your Python DSA solutions line by line. Paste code and optional stdin input, run the visualizer, and navigate execution to see how variables change at each step.
 
+**Runs entirely in your browser** using [Pyodide](https://pyodide.org/) — no server needed. Deploys on Firebase's **free Spark plan**.
+
 ## Features
 
 - **Paste & run** — Write or paste Python DSA code with optional competitive-programming stdin input
@@ -10,10 +12,9 @@ Step through your Python DSA solutions line by line. Paste code and optional std
 - **Line highlighting** — Current executing line is highlighted in the execution view
 - **Output tracking** — Watch `print()` output accumulate as execution progresses
 - **Built-in examples** — Two Sum, Binary Search, BFS, and stdin input patterns
+- **Free to host** — Static site on Firebase Hosting (Spark plan)
 
-## Quick Start
-
-One command sets up a Python virtual environment, installs dependencies, and starts both servers:
+## Quick Start (local)
 
 ```bash
 ./start.sh
@@ -21,32 +22,16 @@ One command sets up a Python virtual environment, installs dependencies, and sta
 
 Then open **http://localhost:5173**
 
-On first run, the script will:
-1. Create a `.venv` virtual environment in the project root
-2. Install Python packages from `backend/requirements.txt`
-3. Install frontend npm packages (if not already installed)
-4. Start the API on port 8000 and the UI on port 5173
+The first load downloads the Python runtime (~10 MB). After that, tracing runs locally in your browser.
 
-**Requirements:** Python 3.10+, Node.js 18+, and `python3-venv` (on Ubuntu/Debian: `sudo apt install python3-venv`)
-
-If needed, make the script executable once:
+**Requirements:** Node.js 18+
 
 ```bash
-chmod +x start.sh
+chmod +x start.sh   # only needed once
 ```
 
 ### Manual start
 
-**Backend:**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-cd backend
-python -m uvicorn main:app --reload --port 8000
-```
-
-**Frontend:**
 ```bash
 cd frontend
 npm install
@@ -57,8 +42,48 @@ npm run dev
 
 1. Paste your Python code in the **Code** panel (or load an example from the dropdown)
 2. Add **Input (stdin)** if your solution reads from `input()`
-3. Click **Run & Visualize**
-4. Use step controls to walk through execution and inspect variables
+3. Wait for "Loading Python..." to finish on first visit
+4. Click **Run & Visualize**
+5. Use step controls to walk through execution and inspect variables
+
+## Deploy to Firebase (free Spark plan)
+
+No Cloud Functions or Blaze plan required — only static **Firebase Hosting**.
+
+### One-time setup
+
+1. Create a [Firebase project](https://console.firebase.google.com/) (Spark/free plan is fine)
+2. Install the Firebase CLI and link your project:
+
+```bash
+npm install
+firebase login
+firebase use --add
+```
+
+### Deploy
+
+```bash
+./deploy.sh
+```
+
+Or:
+
+```bash
+npm run deploy
+```
+
+Your app will be live at `https://<your-project-id>.web.app`.
+
+### Firebase emulator (local)
+
+```bash
+npm install
+npm run build
+npm run emulators
+```
+
+Open **http://localhost:5000**
 
 ## Limitations
 
@@ -66,8 +91,16 @@ npm run dev
 - 5 second execution timeout
 - 2000 step maximum per run
 - Traces line-level execution (not individual expression evaluation)
+- First page load downloads the Pyodide Python runtime
 
 ## Tech Stack
 
-- **Backend:** Python, FastAPI, `sys.settrace`
+- **Execution:** Python via Pyodide (WebAssembly) in the browser, `sys.settrace`
 - **Frontend:** React, TypeScript, Vite
+- **Deploy:** Firebase Hosting (free Spark plan)
+
+## Project structure
+
+- `backend/tracer.py` — Source of truth for the Python tracer (synced to frontend on build)
+- `frontend/` — React app with in-browser Pyodide execution
+- `firebase.json` — Hosting-only Firebase config

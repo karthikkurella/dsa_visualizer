@@ -6,3 +6,6 @@ __pycache__/
 .venv/
 venv/
 *.local
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
