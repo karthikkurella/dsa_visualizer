@@ -40,42 +40,51 @@ Python loads only when you click **Run & Visualize** (first run downloads ~10 MB
 
 ## Deploy to Firebase (free Spark plan)
 
-No Cloud Functions or Blaze plan required — only static **Firebase Hosting**.
+Static **Firebase Hosting** only — works on the free Spark plan, no credit card needed.
 
-### One-time setup
+### Step 1 — Create a Firebase project
 
-1. Create a [Firebase project](https://console.firebase.google.com/) (Spark/free plan is fine)
-2. Install the Firebase CLI and link your project:
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Click **Add project** and follow the steps
+3. You do **not** need to upgrade to Blaze
+
+### Step 2 — One-time setup
 
 ```bash
 npm install
-firebase login
-firebase use --add
+npx firebase login
+npx firebase use --add
 ```
 
-### Deploy
+Select your project when prompted. This updates `.firebaserc`.
 
-```bash
-./deploy.sh
-```
-
-Or:
+### Step 3 — Deploy
 
 ```bash
 npm run deploy
 ```
 
-Your app will be live at `https://<your-project-id>.web.app`.
-
-### Firebase emulator (local)
+Or:
 
 ```bash
-npm install
-npm run build
-npm run emulators
+./deploy.sh
 ```
 
-Open **http://localhost:5000**
+Your app will be live at:
+
+```
+https://<your-project-id>.web.app
+```
+
+You can also find the URL in the Firebase Console under **Hosting**.
+
+### Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `Firebase login required` | Run `npx firebase login` |
+| `your-firebase-project-id` | Run `npx firebase use --add` |
+| Build fails | Run `cd frontend && npm install && npm run build` |
 
 ## Limitations
 

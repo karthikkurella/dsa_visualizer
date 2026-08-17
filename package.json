@@ -4,7 +4,8 @@
   "scripts": {
     "start": "bash start.sh",
     "build": "npm run build --prefix frontend",
-    "deploy": "bash deploy.sh"
+    "deploy": "bash deploy.sh",
+    "firebase": "firebase"
   },
   "devDependencies": {
     "firebase-tools": "^14.0.0"
