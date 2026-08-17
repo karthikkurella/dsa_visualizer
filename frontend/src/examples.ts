@@ -2,6 +2,26 @@ import type { Example } from './types'
 
 export const EXAMPLES: Example[] = [
   {
+    name: 'Subsets (LeetCode)',
+    code: `class Solution:
+    def subsets(self, nums: List[int]) -> List[List[int]]:
+        res = []
+        subset = []
+
+        def dfs(i):
+            if i >= len(nums):
+                res.append(subset.copy())
+                return
+            subset.append(nums[i])
+            dfs(i + 1)
+            subset.pop()
+            dfs(i + 1)
+
+        dfs(0)
+        return res`,
+    input: 'nums = [1,2,3]',
+  },
+  {
     name: 'Two Sum',
     code: `nums = [2, 7, 11, 15]
 target = 9

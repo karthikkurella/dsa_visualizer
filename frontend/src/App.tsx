@@ -66,7 +66,7 @@ function App() {
       <header className="header">
         <div>
           <h1>DSA Code Visualizer</h1>
-          <p className="subtitle">Paste Python code and input, then step through execution line by line.</p>
+          <p className="subtitle">Paste LeetCode-style Solution classes or plain Python. Set inputs like <code>nums = [1,2,3]</code>.</p>
         </div>
         <div className="header-actions">
           <select
@@ -110,19 +110,19 @@ function App() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               spellCheck={false}
-              placeholder="Paste your Python DSA solution here..."
+              placeholder="Paste your Solution class or Python code here..."
             />
           </div>
           <div className="panel">
             <div className="panel-header">
-              <h3>Input (stdin)</h3>
+              <h3>Input</h3>
             </div>
             <textarea
               className="input-editor"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               spellCheck={false}
-              placeholder="Optional: paste competitive programming input here"
+              placeholder="Variable assignments, e.g. nums = [1,2,3]"
             />
           </div>
         </section>
