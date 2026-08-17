@@ -1,40 +1,53 @@
+import type { StackFrame } from '../types'
+
 interface VariablesPanelProps {
-  variables: Record<string, string>
-  callDepth: number
-  functionName: string | null | undefined
+  stack: StackFrame[]
 }
 
-export function VariablesPanel({ variables, callDepth, functionName }: VariablesPanelProps) {
-  const entries = Object.entries(variables)
+export function VariablesPanel({ stack }: VariablesPanelProps) {
+  if (stack.length === 0) {
+    return (
+      <div className="panel variables-panel">
+        <div className="panel-header">
+          <h3>Call Stack</h3>
+        </div>
+        <div className="panel-body">
+          <p className="muted">No stack frames at this step.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="panel variables-panel">
       <div className="panel-header">
-        <h3>Variables</h3>
-        {functionName && <span className="badge">{functionName}()</span>}
-        {callDepth > 0 && <span className="badge depth">depth {callDepth}</span>}
+        <h3>Call Stack</h3>
+        <span className="badge depth">{stack.length} frame{stack.length === 1 ? '' : 's'}</span>
       </div>
-      <div className="panel-body">
-        {entries.length === 0 ? (
-          <p className="muted">No local variables at this step.</p>
-        ) : (
-          <table className="vars-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map(([name, value]) => (
-                <tr key={name}>
-                  <td className="var-name">{name}</td>
-                  <td className="var-value">{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="panel-body stack-trace">
+        {stack.map((frame, index) => (
+          <div key={`${frame.function}-${index}`} className={`stack-frame ${index === 0 ? 'current' : ''}`}>
+            <div className="stack-frame-header">
+              <span className="stack-depth">{stack.length - index}</span>
+              <div className="stack-frame-title">
+                <span className="stack-fn">{frame.function}</span>
+                {frame.line !== null && <span className="stack-line">line {frame.line}</span>}
+              </div>
+            </div>
+            {Object.keys(frame.variables).length > 0 ? (
+              <div className="stack-vars">
+                {Object.entries(frame.variables).map(([name, value]) => (
+                  <div key={name} className="stack-var-row">
+                    <span className="var-name">{name}</span>
+                    <span className="var-value">{value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted stack-empty">No local variables</p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )

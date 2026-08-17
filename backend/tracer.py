@@ -25,6 +25,7 @@ class TraceStep:
     stdout: str
     call_depth: int
     function: str | None = None
+    stack: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -82,10 +83,36 @@ def _serialize(value: Any, depth: int = 0) -> str:
         return f"<{type(value).__name__}>"
 
 
+def _collect_stack(frame: Any, user_start: int, user_end: int) -> list[dict[str, Any]]:
+    frames: list[dict[str, Any]] = []
+    current = frame
+    while current is not None:
+        if current.f_code.co_filename != "<user_code>":
+            current = current.f_back
+            continue
+
+        name = current.f_code.co_name
+        display_name = "module" if name == "<module>" else f"{name}()"
+        variables = _collect_variables(current)
+        line = _map_line_to_display(current.f_lineno, user_start, user_end)
+
+        if variables or name != "<module>":
+            frames.append(
+                {
+                    "function": display_name,
+                    "line": line,
+                    "variables": variables,
+                }
+            )
+        current = current.f_back
+    return frames
+
+
 def _collect_variables(frame: Any) -> dict[str, str]:
     skip = {
         "__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__",
         "_solution", "_result", "_TypeStub",
+        "List", "Dict", "Set", "Tuple", "Optional",
     }
     result: dict[str, str] = {}
     for name, value in frame.f_locals.items():
@@ -206,6 +233,7 @@ def _remap_steps(steps: list[TraceStep], user_start: int, user_end: int) -> list
                     stdout=step.stdout,
                     call_depth=step.call_depth,
                     function=step.function,
+                    stack=step.stack,
                 )
             )
         elif step.event == "end":
@@ -219,6 +247,7 @@ def _remap_steps(steps: list[TraceStep], user_start: int, user_end: int) -> list
                     stdout=step.stdout,
                     call_depth=0,
                     function=None,
+                    stack=step.stack,
                 )
             )
     return remapped
@@ -286,6 +315,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
 
             if event == "line":
                 step_counter += 1
+                stack = _collect_stack(frame, user_start, user_end)
                 steps.append(
                     TraceStep(
                         step=step_counter,
@@ -295,6 +325,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
                         stdout=stdout_buffer.getvalue(),
                         call_depth=call_depth,
                         function=frame.f_code.co_name if frame.f_code.co_name != "<module>" else None,
+                        stack=stack,
                     )
                 )
             return trace_fn
@@ -356,6 +387,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
                     stdout=final_stdout,
                     call_depth=0,
                     function=None,
+                    stack=last.stack,
                 )
             )
     elif final_stdout:
@@ -367,6 +399,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
                 variables={},
                 stdout=final_stdout,
                 call_depth=0,
+                stack=[],
             )
         )
 
