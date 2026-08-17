@@ -14,7 +14,10 @@
         "destination": "/index.html"
       }
     ],
-    "predeploy": ["npm run build --prefix frontend"]
+    "predeploy": [
+      "npm install --prefix frontend --include=dev",
+      "npm run build --prefix frontend"
+    ]
   },
   "emulators": {
     "hosting": { "port": 5000 },
