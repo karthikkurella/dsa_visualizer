@@ -20,7 +20,9 @@ function App() {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [error, setError] = useState<string | null>(null)
-  const [showCode, setShowCode] = useState(false)
+
+  const codeLineCount = useMemo(() => code.split('\n').length + 1, [code])
+  const inputLineCount = useMemo(() => Math.max(2, input.split('\n').length + 1), [input])
 
   const runTrace = useCallback(async () => {
     setLoading(true)
@@ -156,7 +158,7 @@ function App() {
 
       <div className="workspace">
         <section className="editor-section">
-          <div className="panel">
+          <div className="panel editor-panel">
             <div className="panel-header">
               <h3>Code</h3>
             </div>
@@ -165,10 +167,11 @@ function App() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               spellCheck={false}
+              rows={Math.max(14, codeLineCount)}
               placeholder="Paste your Solution class or Python code here..."
             />
           </div>
-          <div className="panel">
+          <div className="panel editor-panel input-panel">
             <div className="panel-header">
               <h3>Input</h3>
             </div>
@@ -177,12 +180,13 @@ function App() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               spellCheck={false}
+              rows={inputLineCount}
               placeholder="Variable assignments, e.g. nums = [1,2,3]"
             />
           </div>
         </section>
 
-        <section className="viz-section visual-layout">
+        <section className="main-section">
           <div className="panel visual-panel">
             <PlaybackBar
               title={exampleName}
@@ -221,25 +225,19 @@ function App() {
             </div>
           </div>
 
-          <aside className="side-panel compact-side">
-            <button type="button" className="toggle-code" onClick={() => setShowCode((value) => !value)}>
-              {showCode ? 'Hide code view' : 'Show code view'}
-            </button>
-
-            {showCode && (
-              <div className="panel code-panel">
-                <div className="panel-header">
-                  <h3>Code</h3>
-                  {currentStep?.event === 'end' && <span className="badge done">finished</span>}
-                </div>
-                <CodeViewer
-                  lines={sourceLines}
-                  activeLine={activeLine}
-                  errorLine={trace?.errorLine ?? null}
-                />
+          {trace && (
+            <div className="panel code-panel execution-panel">
+              <div className="panel-header">
+                <h3>Execution</h3>
+                {currentStep?.event === 'end' && <span className="badge done">finished</span>}
               </div>
-            )}
-          </aside>
+              <CodeViewer
+                lines={sourceLines}
+                activeLine={activeLine}
+                errorLine={trace?.errorLine ?? null}
+              />
+            </div>
+          )}
         </section>
       </div>
 
