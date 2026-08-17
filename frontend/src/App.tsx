@@ -185,6 +185,13 @@ function App() {
               placeholder="Variable assignments, e.g. nums = [1,2,3]"
             />
           </div>
+
+          <CallStackChain
+            stack={currentStep?.stack ?? []}
+            callDepth={currentStep?.call_depth ?? 0}
+            currentFunction={currentStep?.function}
+            hasTrace={!!trace}
+          />
         </section>
 
         <section className="main-section">
@@ -206,11 +213,6 @@ function App() {
             />
 
             <div className="panel-body visual-body">
-              <CallStackChain
-                stack={currentStep?.stack ?? []}
-                callDepth={currentStep?.call_depth ?? 0}
-              />
-
               <VisualStatePanel
                 variables={currentVars}
                 changedKeys={changedKeys}
