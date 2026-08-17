@@ -84,7 +84,7 @@ def _serialize(value: Any, depth: int = 0) -> str:
 
 
 def _collect_stack(frame: Any, user_start: int, user_end: int) -> list[dict[str, Any]]:
-    frames: list[dict[str, Any]] = []
+    raw_frames: list[dict[str, Any]] = []
     current = frame
     while current is not None:
         if current.f_code.co_filename != "<user_code>":
@@ -92,12 +92,13 @@ def _collect_stack(frame: Any, user_start: int, user_end: int) -> list[dict[str,
             continue
 
         name = current.f_code.co_name
-        display_name = "module" if name == "<module>" else f"{name}()"
+        is_module = name == "<module>"
+        display_name = "Global variables" if is_module else name
         variables = _collect_variables(current)
         line = _map_line_to_display(current.f_lineno, user_start, user_end)
 
-        if variables or name != "<module>":
-            frames.append(
+        if variables or not is_module:
+            raw_frames.append(
                 {
                     "function": display_name,
                     "line": line,
@@ -105,14 +106,27 @@ def _collect_stack(frame: Any, user_start: int, user_end: int) -> list[dict[str,
                 }
             )
         current = current.f_back
-    return frames
+
+    for index, entry in enumerate(raw_frames):
+        fn = entry["function"]
+        recursion = sum(1 for j in range(index + 1) if raw_frames[j]["function"] == fn)
+        entry["recursion"] = recursion if recursion > 1 else None
+
+        if index == 0:
+            entry["label"] = "Right now"
+        elif fn == "Global variables":
+            entry["label"] = "Inputs"
+        else:
+            entry["label"] = "Called from"
+
+    return raw_frames
 
 
 def _collect_variables(frame: Any) -> dict[str, str]:
     skip = {
         "__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__",
         "_solution", "_result", "_TypeStub",
-        "List", "Dict", "Set", "Tuple", "Optional",
+        "List", "Dict", "Set", "Tuple", "Optional", "self",
     }
     result: dict[str, str] = {}
     for name, value in frame.f_locals.items():
@@ -121,7 +135,12 @@ def _collect_variables(frame: Any) -> dict[str, str]:
         if name in skip:
             continue
         try:
-            result[name] = _serialize(value)
+            serialized = _serialize(value)
+            if serialized.startswith("<function") or serialized.startswith("<bound method"):
+                continue
+            if serialized.startswith("<class 'Solution'>"):
+                continue
+            result[name] = serialized
         except Exception:
             result[name] = "<unable to display>"
     return result

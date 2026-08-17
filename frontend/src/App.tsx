@@ -3,6 +3,7 @@ import { traceCode } from './api'
 import { EXAMPLES } from './examples'
 import { CodeViewer } from './components/CodeViewer'
 import { PlaybackBar } from './components/PlaybackBar'
+import { CallStackChain } from './components/CallStackChain'
 import { VisualStatePanel } from './components/VisualStatePanel'
 import type { TraceResponse } from './types'
 import { explainStep } from './utils/stepExplanation'
@@ -205,6 +206,11 @@ function App() {
             />
 
             <div className="panel-body visual-body">
+              <CallStackChain
+                stack={currentStep?.stack ?? []}
+                callDepth={currentStep?.call_depth ?? 0}
+              />
+
               <VisualStatePanel
                 variables={currentVars}
                 changedKeys={changedKeys}
