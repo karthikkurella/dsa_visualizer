@@ -5,6 +5,7 @@ interface CallStackChainProps {
   stack: StackFrame[]
   callDepth: number
   currentFunction?: string | null
+  hasTrace?: boolean
 }
 
 function formatName(frame: StackFrame): string {
@@ -20,12 +21,16 @@ function formatName(frame: StackFrame): string {
   return base
 }
 
-function chainSummary(stack: StackFrame[], callDepth: number, currentFunction?: string | null): string {
+function collapsedSummary(
+  stack: StackFrame[],
+  callDepth: number,
+  currentFunction?: string | null,
+): string {
   if (stack.length > 0) {
-    return [...stack].reverse().map(formatName).join(' → ')
+    return formatName(stack[0])
   }
   if (currentFunction) {
-    return `module → ${currentFunction}`
+    return currentFunction
   }
   if (callDepth > 0) {
     return `depth ${callDepth}`
@@ -33,139 +38,88 @@ function chainSummary(stack: StackFrame[], callDepth: number, currentFunction?: 
   return 'No active calls'
 }
 
-interface CollapsibleSectionProps {
-  id: string
-  title: string
-  summary: string
-  defaultOpen?: boolean
-  children: React.ReactNode
-}
-
-function CollapsibleSection({
-  id,
-  title,
-  summary,
-  defaultOpen = false,
-  children,
-}: CollapsibleSectionProps) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  return (
-    <section className={`collapsible-section ${open ? 'open' : 'closed'}`}>
-      <button
-        type="button"
-        className="collapsible-header"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="collapsible-chevron" aria-hidden="true">
-          {open ? '▾' : '▸'}
-        </span>
-        <span className="collapsible-title">{title}</span>
-        {!open && <span className="collapsible-summary">{summary}</span>}
-      </button>
-      {open && (
-        <div id={id} className="collapsible-body">
-          {children}
-        </div>
-      )}
-    </section>
-  )
-}
-
-export function CallStackChain({ stack, callDepth, currentFunction }: CallStackChainProps) {
+export function CallStackChain({
+  stack,
+  callDepth,
+  currentFunction,
+  hasTrace = false,
+}: CallStackChainProps) {
+  const [open, setOpen] = useState(true)
   const depth = callDepth || stack.length
   const hasStack = stack.length > 0
-  const currentFrame = stack[0]
   const chain = hasStack ? [...stack].reverse() : []
-  const summary = chainSummary(stack, callDepth, currentFunction)
 
   return (
-    <div className="call-stack-area">
-      <CollapsibleSection
-        id="call-chain-panel"
-        title="Call chain"
-        summary={summary}
-        defaultOpen
+    <div className="panel call-stack-panel call-stack-sidebar">
+      <button
+        type="button"
+        className="panel-header call-stack-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
       >
-        {hasStack ? (
-          <div className="chain-breadcrumb" aria-label="Call chain">
-            {chain.map((frame, index) => (
-              <span key={`${frame.function}-${index}`} className="chain-crumb-wrap">
-                {index > 0 && <span className="chain-arrow">→</span>}
-                <span className={`chain-crumb ${index === chain.length - 1 ? 'current' : ''}`}>
-                  {formatName(frame)}
-                  {frame.line !== null && <span className="chain-line">:{frame.line}</span>}
-                </span>
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="muted call-stack-empty">
-            {currentFunction
-              ? `Inside ${currentFunction}() — step forward to see the full call chain.`
-              : 'Step through execution to see how functions call each other.'}
-          </p>
+        <span className="call-stack-chevron" aria-hidden="true">
+          {open ? '▾' : '▸'}
+        </span>
+        <h3>Call Stack</h3>
+        {depth > 0 && <span className="badge depth">depth {depth}</span>}
+        {!open && (
+          <span className="call-stack-collapsed-summary">
+            {hasTrace ? collapsedSummary(stack, callDepth, currentFunction) : 'Run to view'}
+          </span>
         )}
-      </CollapsibleSection>
+      </button>
 
-      <CollapsibleSection
-        id="stack-depth-panel"
-        title="Stack depth"
-        summary={hasStack ? `depth ${depth} · ${formatName(currentFrame)}` : `depth ${depth}`}
-        defaultOpen={depth > 1}
-      >
-        {hasStack ? (
-          <div className="stack-outline">
-            {stack.map((frame, index) => {
-              const isCurrent = index === 0
-              const isLast = index === stack.length - 1
-              const frameDepth = stack.length - index
+      {open && (
+        <div className="panel-body call-stack-body">
+          {!hasTrace ? (
+            <p className="muted call-stack-empty">Run your code to see the call stack chain.</p>
+          ) : !hasStack ? (
+            <p className="muted call-stack-empty">
+              {currentFunction
+                ? `Inside ${currentFunction}() — step forward to see frames.`
+                : 'Step through execution to see the call chain.'}
+            </p>
+          ) : (
+            <ol className="stack-vertical-chain" aria-label="Call stack">
+              {chain.map((frame, index) => {
+                const isCurrent = index === chain.length - 1
+                const rank = index + 1
 
-              return (
-                <div
-                  key={`${frame.function}-${frame.line}-${index}`}
-                  className={`stack-node ${isCurrent ? 'current' : ''}`}
-                >
-                  <div className="stack-node-line">
-                    {!isLast && <span className="stack-connector" />}
-                    <span className="stack-depth-badge">{frameDepth}</span>
-                    <div className="stack-node-card">
-                      <div className="stack-node-header">
-                        <span className="stack-node-fn">{formatName(frame)}</span>
+                return (
+                  <li
+                    key={`${frame.function}-${frame.line}-${index}`}
+                    className={`stack-vertical-item ${isCurrent ? 'current' : ''}`}
+                  >
+                    <div className="stack-vertical-rail">
+                      <span className="stack-vertical-rank">{rank}</span>
+                      {index < chain.length - 1 && <span className="stack-vertical-line" />}
+                    </div>
+                    <div className="stack-vertical-content">
+                      <div className="stack-vertical-header">
+                        <span className="stack-vertical-fn">{formatName(frame)}</span>
                         {frame.line !== null && (
-                          <span className="stack-node-line-no">line {frame.line}</span>
+                          <span className="stack-vertical-line-no">:{frame.line}</span>
                         )}
                         {isCurrent && <span className="stack-now-badge">now</span>}
                       </div>
-                      {Object.keys(frame.variables).length > 0 ? (
-                        <div className="stack-node-vars">
+                      {isCurrent && Object.keys(frame.variables).length > 0 && (
+                        <div className="stack-vertical-vars">
                           {Object.entries(frame.variables).map(([name, value]) => (
-                            <div key={name} className="stack-node-var">
+                            <div key={name} className="stack-vertical-var">
                               <span className="stack-var-name">{name}</span>
-                              <span className="stack-var-eq">=</span>
                               <span className="stack-var-value">{value}</span>
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <p className="muted stack-node-empty">no locals</p>
                       )}
                     </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <p className="muted call-stack-empty">
-            {callDepth > 0
-              ? `Call depth is ${callDepth}. Step forward to inspect variables at each level.`
-              : 'No stack frames yet.'}
-          </p>
-        )}
-      </CollapsibleSection>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </div>
+      )}
     </div>
   )
 }

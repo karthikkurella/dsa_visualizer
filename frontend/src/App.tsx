@@ -185,6 +185,13 @@ function App() {
               placeholder="Variable assignments, e.g. nums = [1,2,3]"
             />
           </div>
+
+          <CallStackChain
+            stack={currentStep?.stack ?? []}
+            callDepth={currentStep?.call_depth ?? 0}
+            currentFunction={currentStep?.function}
+            hasTrace={!!trace}
+          />
         </section>
 
         <section className="main-section">
@@ -204,24 +211,6 @@ function App() {
               onStepSelect={setStepIndex}
               onSpeedChange={setSpeed}
             />
-
-            {trace && (
-              <div className="panel call-stack-panel">
-                <div className="panel-header">
-                  <h3>Call Stack</h3>
-                  {(currentStep?.call_depth ?? 0) > 0 && (
-                    <span className="badge depth">depth {currentStep?.call_depth}</span>
-                  )}
-                </div>
-                <div className="panel-body call-stack-body">
-                  <CallStackChain
-                    stack={currentStep?.stack ?? []}
-                    callDepth={currentStep?.call_depth ?? 0}
-                    currentFunction={currentStep?.function}
-                  />
-                </div>
-              </div>
-            )}
 
             <div className="panel-body visual-body">
               <VisualStatePanel
