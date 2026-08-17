@@ -37,6 +37,15 @@ class TraceResult:
     final_stdout: str = ""
 
 
+@dataclass
+class PreparedCode:
+    executable: str
+    stdin_text: str
+    display_lines: list[str]
+    user_line_start: int
+    user_line_end: int
+
+
 def _serialize(value: Any, depth: int = 0) -> str:
     if depth > 3:
         return "..."
@@ -74,7 +83,10 @@ def _serialize(value: Any, depth: int = 0) -> str:
 
 
 def _collect_variables(frame: Any) -> dict[str, str]:
-    skip = {"__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__"}
+    skip = {
+        "__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__",
+        "_solution", "_result", "_TypeStub",
+    }
     result: dict[str, str] = {}
     for name, value in frame.f_locals.items():
         if name.startswith("__") and name.endswith("__"):
@@ -110,6 +122,8 @@ class _TypeStub:
 
 def _typing_stubs() -> str:
     return """
+__name__ = "__main__"
+
 class _TypeStub:
     def __getitem__(self, _item):
         return self
@@ -129,20 +143,27 @@ def _find_solution_method(code: str) -> tuple[str, list[str]] | None:
     return None
 
 
-def _prepare_code(source: str, input_text: str) -> tuple[str, str]:
+def _prepare_code(source: str, input_text: str) -> PreparedCode:
     """Wrap LeetCode Solution classes and merge variable inputs."""
+    display_lines = source.splitlines()
     stripped_input = input_text.strip()
+    user_line_count = len(display_lines)
+    user_start = 1
+    user_end = user_line_count
 
     if "class Solution" in source:
+        prefix = _typing_stubs().strip("\n") + "\n"
+        user_start = len(prefix.splitlines()) + 1
+        user_end = user_start + user_line_count - 1
+
         method_info = _find_solution_method(source)
         if not method_info:
-            body = f"{_typing_stubs()}\n{source}"
-            return body, stripped_input
+            executable = prefix + source
+            return PreparedCode(executable, stripped_input, display_lines, user_start, user_end)
 
         method_name, params = method_info
         call_args = ", ".join(params)
-        body = f"""{_typing_stubs()}
-{source}
+        executable = f"""{prefix}{source}
 
 {stripped_input}
 
@@ -150,12 +171,57 @@ _solution = Solution()
 _result = _solution.{method_name}({call_args})
 print(_result)
 """
-        return body, ""
+        return PreparedCode(executable, "", display_lines, user_start, user_end)
 
     if stripped_input and "=" in stripped_input:
-        return f"{source}\n\n{stripped_input}", ""
+        executable = f"{source}\n\n{stripped_input}"
+        return PreparedCode(executable, "", display_lines, user_start, user_end)
 
-    return source, stripped_input
+    return PreparedCode(source, stripped_input, display_lines, user_start, user_end)
+
+
+def _map_line_to_display(line: int | None, user_start: int, user_end: int) -> int | None:
+    if line is None:
+        return None
+    if user_start <= line <= user_end:
+        return line - user_start + 1
+    return None
+
+
+def _remap_steps(steps: list[TraceStep], user_start: int, user_end: int) -> list[TraceStep]:
+    remapped: list[TraceStep] = []
+    step_num = 0
+    for step in steps:
+        if step.event == "line":
+            display_line = _map_line_to_display(step.line, user_start, user_end)
+            if display_line is None:
+                continue
+            step_num += 1
+            remapped.append(
+                TraceStep(
+                    step=step_num,
+                    line=display_line,
+                    event=step.event,
+                    variables=step.variables,
+                    stdout=step.stdout,
+                    call_depth=step.call_depth,
+                    function=step.function,
+                )
+            )
+        elif step.event == "end":
+            step_num += 1
+            remapped.append(
+                TraceStep(
+                    step=step_num,
+                    line=None,
+                    event=step.event,
+                    variables=step.variables,
+                    stdout=step.stdout,
+                    call_depth=0,
+                    function=None,
+                )
+            )
+    return remapped
 
 
 def _safe_builtins() -> dict[str, Any]:
@@ -177,8 +243,13 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     if validation_error:
         return TraceResult(success=False, error=validation_error)
 
-    executable, stdin_text = _prepare_code(source, stdin_text)
-    source_lines = executable.splitlines()
+    prepared = _prepare_code(source, stdin_text)
+    executable = prepared.executable
+    stdin_text = prepared.stdin_text
+    display_lines = prepared.display_lines
+    user_start = prepared.user_line_start
+    user_end = prepared.user_line_end
+
     steps: list[TraceStep] = []
     stdout_buffer = io.StringIO()
     step_counter = 0
@@ -247,8 +318,8 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     except TimeoutError as exc:
         return TraceResult(
             success=False,
-            steps=[s.__dict__ for s in steps],
-            source_lines=source_lines,
+            steps=[s.__dict__ for s in _remap_steps(steps, user_start, user_end)],
+            source_lines=display_lines,
             error=str(exc),
             final_stdout=stdout_buffer.getvalue(),
         )
@@ -258,12 +329,12 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
         error_line = None
         for entry in reversed(tb_lines):
             if entry.filename == "<user_code>":
-                error_line = entry.lineno
+                error_line = _map_line_to_display(entry.lineno, user_start, user_end)
                 break
         return TraceResult(
             success=False,
-            steps=[s.__dict__ for s in steps],
-            source_lines=source_lines,
+            steps=[s.__dict__ for s in _remap_steps(steps, user_start, user_end)],
+            source_lines=display_lines,
             error=f"{exc_type.__name__}: {exc_value}",
             error_line=error_line,
             final_stdout=stdout_buffer.getvalue(),
@@ -299,9 +370,11 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
             )
         )
 
+    remapped_steps = _remap_steps(steps, user_start, user_end)
+
     return TraceResult(
         success=True,
-        steps=[s.__dict__ for s in steps],
-        source_lines=source_lines,
+        steps=[s.__dict__ for s in remapped_steps],
+        source_lines=display_lines,
         final_stdout=final_stdout,
     )
