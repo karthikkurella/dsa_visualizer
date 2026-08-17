@@ -303,6 +303,21 @@ body {
   margin-bottom: 0.55rem;
 }
 
+.call-stack-panel {
+  border-color: #4a3563;
+  background: linear-gradient(180deg, #14101c 0%, var(--bg-elevated) 100%);
+}
+
+.call-stack-body {
+  padding: 0.75rem;
+}
+
+.call-stack-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
 .call-stack-area {
   display: flex;
   flex-direction: column;

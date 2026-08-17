@@ -97,14 +97,13 @@ def _collect_stack(frame: Any, user_start: int, user_end: int) -> list[dict[str,
         variables = _collect_variables(current)
         line = _map_line_to_display(current.f_lineno, user_start, user_end)
 
-        if variables or not is_module:
-            raw_frames.append(
-                {
-                    "function": display_name,
-                    "line": line,
-                    "variables": variables,
-                }
-            )
+        raw_frames.append(
+            {
+                "function": display_name,
+                "line": line,
+                "variables": variables,
+            }
+        )
         current = current.f_back
 
     for index, entry in enumerate(raw_frames):
