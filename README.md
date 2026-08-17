@@ -17,26 +17,18 @@ Step through your Python DSA solutions line by line. Paste code and optional std
 ## Quick Start (local)
 
 ```bash
+npm start
+```
+
+Or:
+
+```bash
 ./start.sh
 ```
 
-Then open **http://localhost:5173**
+Open **http://localhost:5173** — no build step, starts in seconds.
 
-The first load downloads the Python runtime (~10 MB). After that, tracing runs locally in your browser.
-
-**Requirements:** Node.js 18+
-
-```bash
-chmod +x start.sh   # only needed once
-```
-
-### Manual start
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Python loads only when you click **Run & Visualize** (first run downloads ~10 MB).
 
 ## How to Use
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { traceCode, preloadPythonRuntime } from './api'
+import { traceCode } from './api'
 import { EXAMPLES } from './examples'
 import { CodeViewer } from './components/CodeViewer'
 import { VariablesPanel } from './components/VariablesPanel'
@@ -15,16 +15,7 @@ function App() {
   const [trace, setTrace] = useState<TraceResponse | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [runtimeLoading, setRuntimeLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    preloadPythonRuntime()
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Failed to load Python runtime')
-      })
-      .finally(() => setRuntimeLoading(false))
-  }, [])
 
   const runTrace = useCallback(async () => {
     setLoading(true)
@@ -95,8 +86,8 @@ function App() {
               </option>
             ))}
           </select>
-          <button type="button" className="btn primary" onClick={runTrace} disabled={loading || runtimeLoading}>
-            {runtimeLoading ? 'Loading Python...' : loading ? 'Running...' : '▶ Run & Visualize'}
+          <button type="button" className="btn primary" onClick={runTrace} disabled={loading}>
+            {loading ? 'Loading Python & running...' : '▶ Run & Visualize'}
           </button>
         </div>
       </header>
