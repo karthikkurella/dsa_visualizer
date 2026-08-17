@@ -1,34 +1,22 @@
-import { loadPyodide, type PyodideInterface } from 'pyodide'
-import tracerSource from './tracer.py?raw'
 import type { TraceResponse } from '../types'
+import tracerSource from './tracer.py?raw'
 
-const PYODIDE_VERSION = '0.26.4'
-const PYODIDE_CDN = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
+const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
+
+type PyodideInterface = Awaited<ReturnType<typeof import('pyodide')['loadPyodide']>>
 
 let pyodidePromise: Promise<PyodideInterface> | null = null
-let tracerLoaded = false
 
 async function getPyodide(): Promise<PyodideInterface> {
   if (!pyodidePromise) {
-    pyodidePromise = loadPyodide({ indexURL: PYODIDE_CDN })
+    pyodidePromise = (async () => {
+      const { loadPyodide } = await import('pyodide')
+      const pyodide = await loadPyodide({ indexURL: PYODIDE_CDN })
+      await pyodide.runPythonAsync(tracerSource)
+      return pyodide
+    })()
   }
-
-  const pyodide = await pyodidePromise
-
-  if (!tracerLoaded) {
-    await pyodide.runPythonAsync(tracerSource)
-    tracerLoaded = true
-  }
-
-  return pyodide
-}
-
-export function preloadPythonRuntime(): Promise<void> {
-  return getPyodide().then(() => undefined)
-}
-
-export function isPythonRuntimeReady(): boolean {
-  return tracerLoaded
+  return pyodidePromise
 }
 
 export async function traceCode(code: string, input: string): Promise<TraceResponse> {
@@ -39,7 +27,6 @@ export async function traceCode(code: string, input: string): Promise<TraceRespo
 
   const resultJson = await pyodide.runPythonAsync(`
 import json
-
 result = trace_code(_user_code, _user_input)
 json.dumps({
     "success": result.success,

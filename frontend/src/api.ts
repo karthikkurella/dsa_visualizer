@@ -1,1 +1,1 @@
-export { traceCode, preloadPythonRuntime, isPythonRuntimeReady } from './tracer/pyodideTracer'
+export { traceCode } from './tracer/pyodideTracer'
