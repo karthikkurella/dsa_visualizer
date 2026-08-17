@@ -60,6 +60,48 @@ npm run dev
 3. Click **Run & Visualize**
 4. Use step controls to walk through execution and inspect variables
 
+## Deploy to Firebase
+
+Host the app on **Firebase Hosting** with the Python API on **Cloud Functions**.
+
+### One-time setup
+
+1. Create a [Firebase project](https://console.firebase.google.com/) (Blaze plan required for Cloud Functions)
+2. Install the Firebase CLI and link your project:
+
+```bash
+npm install
+firebase login
+firebase use --add
+```
+
+### Deploy
+
+```bash
+./deploy.sh
+```
+
+Or:
+
+```bash
+npm run deploy
+```
+
+This builds the React frontend, packages the Python tracer into Cloud Functions, and deploys both hosting and functions.
+
+Your app will be live at `https://<your-project-id>.web.app`.
+
+### Firebase emulator (local)
+
+```bash
+npm install
+cp backend/tracer.py functions/tracer.py
+npm run build
+npm run emulators
+```
+
+Open **http://localhost:5000** — API requests are rewritten to the functions emulator.
+
 ## Limitations
 
 - Python only (no imports allowed for security)
@@ -69,5 +111,6 @@ npm run dev
 
 ## Tech Stack
 
-- **Backend:** Python, FastAPI, `sys.settrace`
+- **Backend:** Python, FastAPI (local) / Firebase Cloud Functions (production), `sys.settrace`
 - **Frontend:** React, TypeScript, Vite
+- **Deploy:** Firebase Hosting + Cloud Functions

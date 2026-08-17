@@ -1,0 +1,14 @@
+{
+  "name": "dsa-visualizer",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix frontend",
+    "deploy": "firebase deploy",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:functions": "firebase deploy --only functions",
+    "emulators": "firebase emulators:start --only hosting,functions"
+  },
+  "devDependencies": {
+    "firebase-tools": "^14.0.0"
+  }
+}
