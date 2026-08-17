@@ -19,8 +19,5 @@ fi
 echo "==> Building frontend..."
 npm run build --prefix "$ROOT/frontend"
 
-echo "==> Copying tracer into functions..."
-cp "$ROOT/backend/tracer.py" "$ROOT/functions/tracer.py"
-
-echo "==> Deploying to Firebase..."
-firebase deploy "$@"
+echo "==> Deploying to Firebase Hosting (Spark/free plan)..."
+firebase deploy --only hosting "$@"

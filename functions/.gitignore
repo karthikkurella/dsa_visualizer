@@ -1,5 +1,0 @@
-# Copied from backend/tracer.py during firebase predeploy
-tracer.py
-venv/
-__pycache__/
-*.pyc

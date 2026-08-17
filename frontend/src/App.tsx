@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { traceCode } from './api'
+import { traceCode, preloadPythonRuntime } from './api'
 import { EXAMPLES } from './examples'
 import { CodeViewer } from './components/CodeViewer'
 import { VariablesPanel } from './components/VariablesPanel'
@@ -15,7 +15,16 @@ function App() {
   const [trace, setTrace] = useState<TraceResponse | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [runtimeLoading, setRuntimeLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    preloadPythonRuntime()
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load Python runtime')
+      })
+      .finally(() => setRuntimeLoading(false))
+  }, [])
 
   const runTrace = useCallback(async () => {
     setLoading(true)
@@ -86,8 +95,8 @@ function App() {
               </option>
             ))}
           </select>
-          <button type="button" className="btn primary" onClick={runTrace} disabled={loading}>
-            {loading ? 'Running...' : '▶ Run & Visualize'}
+          <button type="button" className="btn primary" onClick={runTrace} disabled={loading || runtimeLoading}>
+            {runtimeLoading ? 'Loading Python...' : loading ? 'Running...' : '▶ Run & Visualize'}
           </button>
         </div>
       </header>
@@ -171,7 +180,7 @@ function App() {
 
       <footer className="footer">
         <span>Keyboard: ← → or h / l to step</span>
-        <span>Python only · 2000 step limit · 5s timeout</span>
+        <span>Runs in your browser · Python via Pyodide · 2000 step limit · 5s timeout</span>
       </footer>
     </div>
   )
