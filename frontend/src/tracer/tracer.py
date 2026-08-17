@@ -112,6 +112,7 @@ def _collect_variables(frame: Any) -> dict[str, str]:
     skip = {
         "__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__",
         "_solution", "_result", "_TypeStub",
+        "List", "Dict", "Set", "Tuple", "Optional",
     }
     result: dict[str, str] = {}
     for name, value in frame.f_locals.items():

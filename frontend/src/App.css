@@ -359,6 +359,148 @@ body {
   gap: 0.5rem;
 }
 
+.vars-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.toggle-parents {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.toggle-parents:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.frame-block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.frame-block.emphasized {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, #1a2332 0%, var(--bg) 100%);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+
+.frame-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.frame-block.emphasized .frame-heading {
+  border-bottom-color: #2a3f5f;
+}
+
+.frame-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+
+.frame-block:not(.emphasized) .frame-label {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+
+.frame-fn {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.frame-line {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.var-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.7rem 0.65rem;
+}
+
+.var-card {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid #21262d;
+}
+
+.frame-block.emphasized .var-card {
+  background: #0f141b;
+  border-color: #2a3f5f;
+}
+
+.var-card-name {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.var-card-value {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--green);
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.vars-empty {
+  padding: 0.55rem 0.7rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.parent-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.parent-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.parent-divider::before,
+.parent-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .stack-frame {
   border: 1px solid var(--border);
   border-radius: 6px;
