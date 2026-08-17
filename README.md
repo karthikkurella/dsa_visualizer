@@ -13,20 +13,37 @@ Step through your Python DSA solutions line by line. Paste code and optional std
 
 ## Quick Start
 
+One command sets up a Python virtual environment, installs dependencies, and starts both servers:
+
 ```bash
-chmod +x start.sh
 ./start.sh
 ```
 
 Then open **http://localhost:5173**
 
+On first run, the script will:
+1. Create a `.venv` virtual environment in the project root
+2. Install Python packages from `backend/requirements.txt`
+3. Install frontend npm packages (if not already installed)
+4. Start the API on port 8000 and the UI on port 5173
+
+**Requirements:** Python 3.10+, Node.js 18+, and `python3-venv` (on Ubuntu/Debian: `sudo apt install python3-venv`)
+
+If needed, make the script executable once:
+
+```bash
+chmod +x start.sh
+```
+
 ### Manual start
 
 **Backend:**
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
 cd backend
-pip install -r requirements.txt
-python3 -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 ```
 
 **Frontend:**
