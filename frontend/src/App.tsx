@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { traceCode } from './api'
 import { EXAMPLES } from './examples'
 import { CodeViewer } from './components/CodeViewer'
+import { CallStackChain } from './components/CallStackChain'
 import { ExecutionFlowView } from './components/ExecutionFlowView'
 import { PlaybackBar } from './components/PlaybackBar'
 import type { TraceResponse } from './types'
@@ -20,6 +21,9 @@ function App() {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [error, setError] = useState<string | null>(null)
+
+  const codeLineCount = useMemo(() => code.split('\n').length + 1, [code])
+  const inputLineCount = useMemo(() => Math.max(2, input.split('\n').length + 1), [input])
 
   const runTrace = useCallback(async () => {
     setLoading(true)
@@ -180,7 +184,8 @@ function App() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 spellCheck={false}
-                placeholder="Paste your Python code here..."
+                rows={Math.max(14, codeLineCount)}
+                placeholder="Paste your Solution class or Python code here..."
               />
             )}
             {trace && (
@@ -190,7 +195,7 @@ function App() {
             )}
           </div>
 
-          <div className="panel input-panel">
+          <div className="panel editor-panel input-panel">
             <div className="panel-header">
               <h3>Input</h3>
             </div>
@@ -199,9 +204,17 @@ function App() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               spellCheck={false}
+              rows={inputLineCount}
               placeholder="Variable assignments, e.g. nums = [1,2,3]"
             />
           </div>
+
+          <CallStackChain
+            stack={currentStep?.stack ?? []}
+            callDepth={currentStep?.call_depth ?? 0}
+            currentFunction={currentStep?.function}
+            hasTrace={!!trace}
+          />
         </section>
 
         <section className="viz-section">
