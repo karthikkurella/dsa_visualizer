@@ -25,6 +25,7 @@ class TraceStep:
     stdout: str
     call_depth: int
     function: str | None = None
+    stack: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -35,6 +36,15 @@ class TraceResult:
     error: str | None = None
     error_line: int | None = None
     final_stdout: str = ""
+
+
+@dataclass
+class PreparedCode:
+    executable: str
+    stdin_text: str
+    display_lines: list[str]
+    user_line_start: int
+    user_line_end: int
 
 
 def _serialize(value: Any, depth: int = 0) -> str:
@@ -73,8 +83,50 @@ def _serialize(value: Any, depth: int = 0) -> str:
         return f"<{type(value).__name__}>"
 
 
+def _collect_stack(frame: Any, user_start: int, user_end: int) -> list[dict[str, Any]]:
+    raw_frames: list[dict[str, Any]] = []
+    current = frame
+    while current is not None:
+        if current.f_code.co_filename != "<user_code>":
+            current = current.f_back
+            continue
+
+        name = current.f_code.co_name
+        is_module = name == "<module>"
+        display_name = "Global variables" if is_module else name
+        variables = _collect_variables(current)
+        line = _map_line_to_display(current.f_lineno, user_start, user_end)
+
+        raw_frames.append(
+            {
+                "function": display_name,
+                "line": line,
+                "variables": variables,
+            }
+        )
+        current = current.f_back
+
+    for index, entry in enumerate(raw_frames):
+        fn = entry["function"]
+        recursion = sum(1 for j in range(index + 1) if raw_frames[j]["function"] == fn)
+        entry["recursion"] = recursion if recursion > 1 else None
+
+        if index == 0:
+            entry["label"] = "Right now"
+        elif fn == "Global variables":
+            entry["label"] = "Inputs"
+        else:
+            entry["label"] = "Called from"
+
+    return raw_frames
+
+
 def _collect_variables(frame: Any) -> dict[str, str]:
-    skip = {"__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__"}
+    skip = {
+        "__builtins__", "__name__", "__doc__", "__package__", "__loader__", "__spec__", "__annotations__",
+        "_solution", "_result", "_TypeStub",
+        "List", "Dict", "Set", "Tuple", "Optional", "self",
+    }
     result: dict[str, str] = {}
     for name, value in frame.f_locals.items():
         if name.startswith("__") and name.endswith("__"):
@@ -82,7 +134,12 @@ def _collect_variables(frame: Any) -> dict[str, str]:
         if name in skip:
             continue
         try:
-            result[name] = _serialize(value)
+            serialized = _serialize(value)
+            if serialized.startswith("<function") or serialized.startswith("<bound method"):
+                continue
+            if serialized.startswith("<class 'Solution'>"):
+                continue
+            result[name] = serialized
         except Exception:
             result[name] = "<unable to display>"
     return result
@@ -103,6 +160,117 @@ def _validate_code(source: str) -> str | None:
     return None
 
 
+class _TypeStub:
+    def __getitem__(self, _item: Any) -> _TypeStub:
+        return self
+
+
+def _typing_stubs() -> str:
+    return """
+__name__ = "__main__"
+
+class _TypeStub:
+    def __getitem__(self, _item):
+        return self
+
+List = Dict = Set = Tuple = Optional = _TypeStub()
+"""
+
+
+def _find_solution_method(code: str) -> tuple[str, list[str]] | None:
+    tree = ast.parse(code)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "Solution":
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and not item.name.startswith("_"):
+                    params = [arg.arg for arg in item.args.args if arg.arg != "self"]
+                    return item.name, params
+    return None
+
+
+def _prepare_code(source: str, input_text: str) -> PreparedCode:
+    """Wrap LeetCode Solution classes and merge variable inputs."""
+    display_lines = source.splitlines()
+    stripped_input = input_text.strip()
+    user_line_count = len(display_lines)
+    user_start = 1
+    user_end = user_line_count
+
+    if "class Solution" in source:
+        prefix = _typing_stubs().strip("\n") + "\n"
+        user_start = len(prefix.splitlines()) + 1
+        user_end = user_start + user_line_count - 1
+
+        method_info = _find_solution_method(source)
+        if not method_info:
+            executable = prefix + source
+            return PreparedCode(executable, stripped_input, display_lines, user_start, user_end)
+
+        method_name, params = method_info
+        call_args = ", ".join(params)
+        executable = f"""{prefix}{source}
+
+{stripped_input}
+
+_solution = Solution()
+_result = _solution.{method_name}({call_args})
+print(_result)
+"""
+        return PreparedCode(executable, "", display_lines, user_start, user_end)
+
+    if stripped_input and "=" in stripped_input:
+        executable = f"{source}\n\n{stripped_input}"
+        return PreparedCode(executable, "", display_lines, user_start, user_end)
+
+    return PreparedCode(source, stripped_input, display_lines, user_start, user_end)
+
+
+def _map_line_to_display(line: int | None, user_start: int, user_end: int) -> int | None:
+    if line is None:
+        return None
+    if user_start <= line <= user_end:
+        return line - user_start + 1
+    return None
+
+
+def _remap_steps(steps: list[TraceStep], user_start: int, user_end: int) -> list[TraceStep]:
+    remapped: list[TraceStep] = []
+    step_num = 0
+    for step in steps:
+        if step.event == "line":
+            display_line = _map_line_to_display(step.line, user_start, user_end)
+            if display_line is None:
+                continue
+            step_num += 1
+            remapped.append(
+                TraceStep(
+                    step=step_num,
+                    line=display_line,
+                    event=step.event,
+                    variables=step.variables,
+                    stdout=step.stdout,
+                    call_depth=step.call_depth,
+                    function=step.function,
+                    stack=step.stack,
+                )
+            )
+        elif step.event == "end":
+            step_num += 1
+            remapped.append(
+                TraceStep(
+                    step=step_num,
+                    line=None,
+                    event=step.event,
+                    variables=step.variables,
+                    stdout=step.stdout,
+                    call_depth=0,
+                    function=None,
+                    stack=step.stack,
+                )
+            )
+    return remapped
+
+
 def _safe_builtins() -> dict[str, Any]:
     allowed = {
         "abs", "all", "any", "bin", "bool", "chr", "dict", "enumerate", "filter",
@@ -110,6 +278,9 @@ def _safe_builtins() -> dict[str, Any]:
         "len", "list", "map", "max", "min", "oct", "ord", "pow", "print", "range",
         "reversed", "round", "set", "slice", "sorted", "str", "sum", "tuple", "zip",
         "True", "False", "None",
+        "__build_class__", "staticmethod", "classmethod", "property", "super",
+        "type", "object", "callable", "iter", "next",
+        "Exception", "ValueError", "IndexError", "KeyError", "RuntimeError", "AttributeError",
     }
     return {name: getattr(builtins, name) for name in allowed}
 
@@ -119,7 +290,13 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     if validation_error:
         return TraceResult(success=False, error=validation_error)
 
-    source_lines = source.splitlines()
+    prepared = _prepare_code(source, stdin_text)
+    executable = prepared.executable
+    stdin_text = prepared.stdin_text
+    display_lines = prepared.display_lines
+    user_start = prepared.user_line_start
+    user_end = prepared.user_line_end
+
     steps: list[TraceStep] = []
     stdout_buffer = io.StringIO()
     step_counter = 0
@@ -156,6 +333,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
 
             if event == "line":
                 step_counter += 1
+                stack = _collect_stack(frame, user_start, user_end)
                 steps.append(
                     TraceStep(
                         step=step_counter,
@@ -165,6 +343,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
                         stdout=stdout_buffer.getvalue(),
                         call_depth=call_depth,
                         function=frame.f_code.co_name if frame.f_code.co_name != "<module>" else None,
+                        stack=stack,
                     )
                 )
             return trace_fn
@@ -174,8 +353,8 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     stdin_buffer = io.StringIO(stdin_text)
     old_stdin = sys.stdin
 
-    globals_dict: dict[str, Any] = {"__builtins__": _safe_builtins()}
-    compiled = compile(source, "<user_code>", "exec")
+    globals_dict: dict[str, Any] = {"__builtins__": _safe_builtins(), "__name__": "__main__"}
+    compiled = compile(executable, "<user_code>", "exec")
 
     try:
         sys.stdin = stdin_buffer
@@ -188,8 +367,8 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
     except TimeoutError as exc:
         return TraceResult(
             success=False,
-            steps=[s.__dict__ for s in steps],
-            source_lines=source_lines,
+            steps=[s.__dict__ for s in _remap_steps(steps, user_start, user_end)],
+            source_lines=display_lines,
             error=str(exc),
             final_stdout=stdout_buffer.getvalue(),
         )
@@ -199,12 +378,12 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
         error_line = None
         for entry in reversed(tb_lines):
             if entry.filename == "<user_code>":
-                error_line = entry.lineno
+                error_line = _map_line_to_display(entry.lineno, user_start, user_end)
                 break
         return TraceResult(
             success=False,
-            steps=[s.__dict__ for s in steps],
-            source_lines=source_lines,
+            steps=[s.__dict__ for s in _remap_steps(steps, user_start, user_end)],
+            source_lines=display_lines,
             error=f"{exc_type.__name__}: {exc_value}",
             error_line=error_line,
             final_stdout=stdout_buffer.getvalue(),
@@ -226,6 +405,7 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
                     stdout=final_stdout,
                     call_depth=0,
                     function=None,
+                    stack=last.stack,
                 )
             )
     elif final_stdout:
@@ -237,12 +417,15 @@ def trace_code(source: str, stdin_text: str = "") -> TraceResult:
                 variables={},
                 stdout=final_stdout,
                 call_depth=0,
+                stack=[],
             )
         )
 
+    remapped_steps = _remap_steps(steps, user_start, user_end)
+
     return TraceResult(
         success=True,
-        steps=[s.__dict__ for s in steps],
-        source_lines=source_lines,
+        steps=[s.__dict__ for s in remapped_steps],
+        source_lines=display_lines,
         final_stdout=final_stdout,
     )

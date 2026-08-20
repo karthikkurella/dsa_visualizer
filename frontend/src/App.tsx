@@ -1,24 +1,29 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { traceCode } from './api'
 import { EXAMPLES } from './examples'
 import { CodeViewer } from './components/CodeViewer'
-import { VariablesPanel } from './components/VariablesPanel'
-import { StepControls } from './components/StepControls'
+import { ExecutionFlowView } from './components/ExecutionFlowView'
+import { PlaybackBar } from './components/PlaybackBar'
 import type { TraceResponse } from './types'
+import { explainStep } from './utils/stepExplanation'
+import { getChangedKeys, getCurrentVariables } from './utils/visualState'
 import './App.css'
 
 const DEFAULT_CODE = EXAMPLES[0].code
 
 function App() {
   const [code, setCode] = useState(DEFAULT_CODE)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(EXAMPLES[0].input)
   const [trace, setTrace] = useState<TraceResponse | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
   const runTrace = useCallback(async () => {
     setLoading(true)
+    setPlaying(false)
     setError(null)
     try {
       const result = await traceCode(code, input)
@@ -35,6 +40,24 @@ function App() {
     }
   }, [code, input])
 
+  const totalSteps = trace?.steps.length ?? 0
+
+  useEffect(() => {
+    if (!playing || !trace || totalSteps === 0) return
+
+    const timer = window.setInterval(() => {
+      setStepIndex((index) => {
+        if (index >= totalSteps - 1) {
+          setPlaying(false)
+          return index
+        }
+        return index + 1
+      })
+    }, 1000 / speed)
+
+    return () => window.clearInterval(timer)
+  }, [playing, speed, totalSteps, trace])
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!trace || trace.steps.length === 0) return
@@ -42,6 +65,9 @@ function App() {
         setStepIndex((i) => Math.min(i + 1, trace.steps.length - 1))
       } else if (e.key === 'ArrowLeft' || e.key === 'h') {
         setStepIndex((i) => Math.max(i - 1, 0))
+      } else if (e.key === ' ') {
+        e.preventDefault()
+        setPlaying((value) => !value)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -49,8 +75,37 @@ function App() {
   }, [trace])
 
   const currentStep = trace?.steps[stepIndex]
+  const previousStep = stepIndex > 0 ? trace?.steps[stepIndex - 1] : undefined
   const sourceLines = trace?.sourceLines ?? []
   const activeLine = currentStep?.line ?? null
+
+  const currentVars = useMemo(
+    () => getCurrentVariables(currentStep?.stack ?? []),
+    [currentStep],
+  )
+  const previousVars = useMemo(
+    () => getCurrentVariables(previousStep?.stack ?? []),
+    [previousStep],
+  )
+  const changedKeys = useMemo(
+    () => new Set(getChangedKeys(previousVars, currentVars)),
+    [previousVars, currentVars],
+  )
+  const explanation = useMemo(
+    () =>
+      explainStep(
+        sourceLines,
+        currentStep?.line ?? null,
+        previousVars,
+        currentVars,
+        currentStep?.function,
+      ),
+    [sourceLines, currentStep, previousVars, currentVars],
+  )
+
+  const exampleName =
+    EXAMPLES.find((example) => example.code === code && example.input === input)?.name
+    ?? 'Your Solution'
 
   const loadExample = (index: number) => {
     const example = EXAMPLES[index]
@@ -58,15 +113,20 @@ function App() {
     setInput(example.input)
     setTrace(null)
     setStepIndex(0)
+    setPlaying(false)
     setError(null)
   }
+
+  const stdout = currentStep?.stdout || trace?.finalStdout || ''
 
   return (
     <div className="app">
       <header className="header">
         <div>
           <h1>DSA Code Visualizer</h1>
-          <p className="subtitle">Paste Python code and input, then step through execution line by line.</p>
+          <p className="subtitle">
+            Python Tutor-style execution: step through code, frames, calls, and print output.
+          </p>
         </div>
         <div className="header-actions">
           <select
@@ -86,8 +146,11 @@ function App() {
               </option>
             ))}
           </select>
+          <button type="button" className="btn stop" onClick={() => setPlaying(false)} disabled={!playing}>
+            Stop
+          </button>
           <button type="button" className="btn primary" onClick={runTrace} disabled={loading}>
-            {loading ? 'Loading Python & running...' : '▶ Run & Visualize'}
+            {loading ? 'Loading Python...' : 'Run'}
           </button>
         </div>
       </header>
@@ -99,79 +162,93 @@ function App() {
         </div>
       )}
 
-      <div className="workspace">
+      <div className="workspace pt-workspace">
         <section className="editor-section">
-          <div className="panel">
+          <div className="panel editor-panel">
             <div className="panel-header">
-              <h3>Code</h3>
+              <h3>main.py</h3>
             </div>
-            <textarea
-              className="code-editor"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              spellCheck={false}
-              placeholder="Paste your Python DSA solution here..."
-            />
+            {trace ? (
+              <CodeViewer
+                lines={sourceLines}
+                activeLine={activeLine}
+                errorLine={trace?.errorLine ?? null}
+              />
+            ) : (
+              <textarea
+                className="code-editor"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                spellCheck={false}
+                placeholder="Paste your Python code here..."
+              />
+            )}
+            {trace && (
+              <button type="button" className="edit-code-btn" onClick={() => setTrace(null)}>
+                Edit code
+              </button>
+            )}
           </div>
-          <div className="panel">
+
+          <div className="panel input-panel">
             <div className="panel-header">
-              <h3>Input (stdin)</h3>
+              <h3>Input</h3>
             </div>
             <textarea
               className="input-editor"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               spellCheck={false}
-              placeholder="Optional: paste competitive programming input here"
+              placeholder="Variable assignments, e.g. nums = [1,2,3]"
             />
           </div>
         </section>
 
         <section className="viz-section">
-          <div className="panel code-panel">
-            <div className="panel-header">
-              <h3>Execution</h3>
-              {currentStep?.event === 'end' && <span className="badge done">finished</span>}
-            </div>
-            <CodeViewer
-              lines={sourceLines}
-              activeLine={activeLine}
-              errorLine={trace?.errorLine ?? null}
-            />
-          </div>
-
-          <aside className="side-panel">
-            <StepControls
+          <div className="panel flow-panel">
+            <PlaybackBar
+              title={exampleName}
               currentStep={stepIndex}
-              totalSteps={trace?.steps.length ?? 0}
+              totalSteps={totalSteps}
+              playing={playing}
+              speed={speed}
+              disabled={!trace || totalSteps === 0}
               onFirst={() => setStepIndex(0)}
               onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
+              onTogglePlay={() => setPlaying((value) => !value)}
               onNext={() => setStepIndex((i) => Math.min((trace?.steps.length ?? 1) - 1, i + 1))}
               onLast={() => setStepIndex(Math.max(0, (trace?.steps.length ?? 1) - 1))}
-              disabled={!trace || trace.steps.length === 0}
+              onStepSelect={setStepIndex}
+              onSpeedChange={setSpeed}
             />
 
-            <VariablesPanel
-              variables={currentStep?.variables ?? {}}
-              callDepth={currentStep?.call_depth ?? 0}
-              functionName={currentStep?.function}
+            <ExecutionFlowView
+              stack={currentStep?.stack ?? []}
+              changedKeys={changedKeys}
+              stdout={stdout}
+              hasTrace={!!trace}
             />
 
-            <div className="panel output-panel">
-              <div className="panel-header">
-                <h3>Output</h3>
-              </div>
-              <div className="panel-body">
-                <pre className="stdout">{currentStep?.stdout || trace?.finalStdout || '(no output yet)'}</pre>
-              </div>
+            <div className="explanation-panel">
+              <div className="explanation-title">Explanation of this step</div>
+              <p className="explanation-line">
+                {activeLine !== null && sourceLines[activeLine - 1] ? (
+                  <code>{sourceLines[activeLine - 1].trim()}</code>
+                ) : (
+                  <span className="muted">No active line</span>
+                )}
+              </p>
+              <p className="explanation-text">
+                {trace ? explanation : 'Press Run to start the visual walkthrough.'}
+              </p>
             </div>
-          </aside>
+          </div>
         </section>
       </div>
 
       <footer className="footer">
-        <span>Keyboard: ← → or h / l to step</span>
-        <span>Runs in your browser · Python via Pyodide · 2000 step limit · 5s timeout</span>
+        <span>Keyboard: ← → step · space play/pause</span>
+        <span>Runs in your browser · Python via Pyodide</span>
       </footer>
     </div>
   )

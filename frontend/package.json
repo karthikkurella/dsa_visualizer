@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "sync-tracer": "cp ../backend/tracer.py src/tracer/tracer.py",
+    "predev": "npm run sync-tracer",
+    "prebuild": "npm run sync-tracer",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
