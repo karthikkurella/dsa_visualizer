@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { traceCode } from './api'
 import { EXAMPLES } from './examples'
 import { CodeViewer } from './components/CodeViewer'
-import { PlaybackBar } from './components/PlaybackBar'
 import { CallStackChain } from './components/CallStackChain'
-import { VisualStatePanel } from './components/VisualStatePanel'
+import { ExecutionFlowView } from './components/ExecutionFlowView'
+import { PlaybackBar } from './components/PlaybackBar'
 import type { TraceResponse } from './types'
 import { explainStep } from './utils/stepExplanation'
 import { getChangedKeys, getCurrentVariables } from './utils/visualState'
@@ -14,7 +14,7 @@ const DEFAULT_CODE = EXAMPLES[0].code
 
 function App() {
   const [code, setCode] = useState(DEFAULT_CODE)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(EXAMPLES[0].input)
   const [trace, setTrace] = useState<TraceResponse | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -92,7 +92,7 @@ function App() {
     [previousStep],
   )
   const changedKeys = useMemo(
-    () => getChangedKeys(previousVars, currentVars),
+    () => new Set(getChangedKeys(previousVars, currentVars)),
     [previousVars, currentVars],
   )
   const explanation = useMemo(
@@ -107,7 +107,9 @@ function App() {
     [sourceLines, currentStep, previousVars, currentVars],
   )
 
-  const exampleName = EXAMPLES.find((example) => example.code === code && example.input === input)?.name ?? 'Your Solution'
+  const exampleName =
+    EXAMPLES.find((example) => example.code === code && example.input === input)?.name
+    ?? 'Your Solution'
 
   const loadExample = (index: number) => {
     const example = EXAMPLES[index]
@@ -119,12 +121,16 @@ function App() {
     setError(null)
   }
 
+  const stdout = currentStep?.stdout || trace?.finalStdout || ''
+
   return (
     <div className="app">
       <header className="header">
         <div>
           <h1>DSA Code Visualizer</h1>
-          <p className="subtitle">NeetCode-style step-by-step visual execution for your Python solutions.</p>
+          <p className="subtitle">
+            Python Tutor-style execution: step through code, frames, calls, and print output.
+          </p>
         </div>
         <div className="header-actions">
           <select
@@ -144,8 +150,11 @@ function App() {
               </option>
             ))}
           </select>
+          <button type="button" className="btn stop" onClick={() => setPlaying(false)} disabled={!playing}>
+            Stop
+          </button>
           <button type="button" className="btn primary" onClick={runTrace} disabled={loading}>
-            {loading ? 'Loading Python & running...' : '▶ Run & Visualize'}
+            {loading ? 'Loading Python...' : 'Run'}
           </button>
         </div>
       </header>
@@ -157,21 +166,35 @@ function App() {
         </div>
       )}
 
-      <div className="workspace">
+      <div className="workspace pt-workspace">
         <section className="editor-section">
           <div className="panel editor-panel">
             <div className="panel-header">
-              <h3>Code</h3>
+              <h3>main.py</h3>
             </div>
-            <textarea
-              className="code-editor"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              spellCheck={false}
-              rows={Math.max(14, codeLineCount)}
-              placeholder="Paste your Solution class or Python code here..."
-            />
+            {trace ? (
+              <CodeViewer
+                lines={sourceLines}
+                activeLine={activeLine}
+                errorLine={trace?.errorLine ?? null}
+              />
+            ) : (
+              <textarea
+                className="code-editor"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                spellCheck={false}
+                rows={Math.max(14, codeLineCount)}
+                placeholder="Paste your Solution class or Python code here..."
+              />
+            )}
+            {trace && (
+              <button type="button" className="edit-code-btn" onClick={() => setTrace(null)}>
+                Edit code
+              </button>
+            )}
           </div>
+
           <div className="panel editor-panel input-panel">
             <div className="panel-header">
               <h3>Input</h3>
@@ -194,8 +217,8 @@ function App() {
           />
         </section>
 
-        <section className="main-section">
-          <div className="panel visual-panel">
+        <section className="viz-section">
+          <div className="panel flow-panel">
             <PlaybackBar
               title={exampleName}
               currentStep={stepIndex}
@@ -212,40 +235,27 @@ function App() {
               onSpeedChange={setSpeed}
             />
 
-            <div className="panel-body visual-body">
-              <VisualStatePanel
-                variables={currentVars}
-                changedKeys={changedKeys}
-                inputText={input}
-              />
+            <ExecutionFlowView
+              stack={currentStep?.stack ?? []}
+              changedKeys={changedKeys}
+              stdout={stdout}
+              hasTrace={!!trace}
+            />
 
-              <div className="explanation-box">
-                <div className="explanation-label">What&apos;s happening</div>
-                <p>{trace ? explanation : 'Run your code to start the visual walkthrough.'}</p>
-              </div>
-
-              {(currentStep?.stdout || trace?.finalStdout) && (
-                <div className="output-box">
-                  <div className="explanation-label">Output</div>
-                  <pre>{currentStep?.stdout || trace?.finalStdout}</pre>
-                </div>
-              )}
+            <div className="explanation-panel">
+              <div className="explanation-title">Explanation of this step</div>
+              <p className="explanation-line">
+                {activeLine !== null && sourceLines[activeLine - 1] ? (
+                  <code>{sourceLines[activeLine - 1].trim()}</code>
+                ) : (
+                  <span className="muted">No active line</span>
+                )}
+              </p>
+              <p className="explanation-text">
+                {trace ? explanation : 'Press Run to start the visual walkthrough.'}
+              </p>
             </div>
           </div>
-
-          {trace && (
-            <div className="panel code-panel execution-panel">
-              <div className="panel-header">
-                <h3>Execution</h3>
-                {currentStep?.event === 'end' && <span className="badge done">finished</span>}
-              </div>
-              <CodeViewer
-                lines={sourceLines}
-                activeLine={activeLine}
-                errorLine={trace?.errorLine ?? null}
-              />
-            </div>
-          )}
         </section>
       </div>
 

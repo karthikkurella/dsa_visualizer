@@ -6,8 +6,8 @@
   "scripts": {
     "sync-tracer": "cp ../backend/tracer.py src/tracer/tracer.py",
     "predev": "npm run sync-tracer",
-    "dev": "vite",
     "prebuild": "npm run sync-tracer",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "oxlint"
